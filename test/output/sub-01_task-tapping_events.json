@@ -1,0 +1,16 @@
+{
+    "onset": {
+        "Description": "Time relative to the time origin when the stimulus takes on a value.",
+        "Units": "s"
+    },
+    "duration": {
+        "Description": "The time in seconds that the stimulus value continues following the onset.",
+        "Units": "s"
+    },
+    "value": {
+        "Description": "Amplitude of the stimulus (from SNIRF)."
+    },
+    "trial_type": {
+        "trial_type": "A string describing the stimulus condition (from SNIRF)."
+    }
+}
