@@ -9,8 +9,11 @@ from PyQt5 import uic
 from PyQt5.QtCore import pyqtSignal, QTimer
 from PyQt5.QtWidgets import QWidget, QLayout, QGridLayout, QGroupBox, QMainWindow, QSpinBox, QDoubleSpinBox, QCheckBox, \
     QRadioButton, \
-    QFileDialog, QMessageBox, QLineEdit, QTextEdit, QComboBox, QDialog, QFrame
+    QFileDialog, QMessageBox, QLineEdit, QTextEdit, QComboBox, QDialog, QFrame, QTableWidget, QTableWidgetItem
 import StimTool
+
+from Events import *
+from JsonModel import JsonModel
 
 
 def replaceWidget(old_widget: QWidget, new_widget: QWidget):
@@ -146,6 +149,23 @@ class EventsTabWidget(QWidget, UiWidget):
         super().__init__()
         self._name = name
 
+        # --
+
+        self._sidecar = JsonModel()
+        self.treeViewSidecar.setModel(self._sidecar)
+        with open('test/output/sub-01_task-tapping_events.json', 'r') as file:
+            document = json.load(file)
+            self._sidecar.load(document)
+        self.treeViewSidecar.setAlternatingRowColors(True)
+        self.treeViewSidecar.resize(500, 300)
+
+        self._events = Events('test/output/sub-01_task-tapping_events.tsv')
+        self.tableViewEvents.setRowCount(len(self._events.data))
+        self.tableViewEvents.setColumnCount(len(self._events.data[0]))
+        for i, row in enumerate(self._events.data):
+            for j, element in enumerate(row):
+                self.tableViewEvents.setItem(i, j, QTableWidgetItem(element))
+
     def _closed(self):
         print('Tab closed')
 
@@ -170,7 +190,7 @@ class MainWindow(QMainWindow, UiWidget):
 
     def _tab_changed(self, index):
 
-        if self.tabFiles.count() > 0 and type(self.tabFiles.currentWidget) is EventsTabWidget:
+        if self.tabFiles.count() > 0 and type(self.tabFiles.currentWidget()) == EventsTabWidget:
             # Set the menu actions text to reflect selected Events
             name = self.tabFiles.currentWidget().name
             self.actionSave.setText("Save '{}'".format(name))
@@ -183,7 +203,8 @@ class MainWindow(QMainWindow, UiWidget):
         self.actionExport_to_SNIRF.setVisible(visible)
 
     def _open_events(self):
-        self.tabFiles.addTab(EventsTabWidget('foo.tsv'), 'tab')
+        name = 'sub-01_task-tapping_events'
+        self.tabFiles.addTab(EventsTabWidget(name), name)
         self._menubar_set_file_options_visible(True)
 
     def _close_events(self, index):
