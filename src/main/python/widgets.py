@@ -6,11 +6,13 @@ from threading import Thread
 import numpy as np
 import pyqtgraph
 from PyQt5 import uic
-from PyQt5.QtCore import pyqtSignal, QTimer
+from PyQt5.QtCore import pyqtSignal, QTimer, QDir
 from PyQt5.QtWidgets import QWidget, QLayout, QGridLayout, QGroupBox, QMainWindow, QSpinBox, QDoubleSpinBox, QCheckBox, \
-    QRadioButton, \
-    QFileDialog, QMessageBox, QLineEdit, QTextEdit, QComboBox, QDialog, QFrame, QTableWidget, QTableWidgetItem
+    QRadioButton, QFileDialog, QMessageBox, QLineEdit, QTextEdit, QComboBox, QDialog, QFrame, QTableWidget, QTableWidgetItem, \
+    QFileSystemModel
 import StimTool
+
+import pathlib
 
 from Events import *
 from JsonModel import JsonModel
@@ -143,11 +145,13 @@ def _set_widget_value(widget: QWidget, value):
 
 # -- Widgets -----------------------------------------
 
+
 class EventsTabWidget(QWidget, UiWidget):
 
-    def __init__(self, name):
+    def __init__(self, path):
         super().__init__()
-        self._name = name
+        self._path = path
+        self._name = os.path.split(path)[-1]
 
         # --
 
@@ -159,15 +163,17 @@ class EventsTabWidget(QWidget, UiWidget):
         self.treeViewSidecar.setAlternatingRowColors(True)
         self.treeViewSidecar.resize(500, 300)
 
-        self._events = Events('test/output/sub-01_task-tapping_events.tsv')
+        self._events = Events(path)
+        self._header_items = []  # List of QTableWidgetItems corresponding to the headers
         self.tableViewEvents.setRowCount(len(self._events.data))
         self.tableViewEvents.setColumnCount(len(self._events.data[0]))
+        for j, name in enumerate(self._events.column_names):
+            header_item = QTableWidgetItem(name)
+            self._header_items.append(header_item)
+            self.tableViewEvents.setHorizontalHeaderItem(j, header_item)
         for i, row in enumerate(self._events.data):
             for j, element in enumerate(row):
                 self.tableViewEvents.setItem(i, j, QTableWidgetItem(element))
-
-    def _closed(self):
-        print('Tab closed')
 
     @property
     def name(self):
@@ -179,17 +185,55 @@ class MainWindow(QMainWindow, UiWidget):
     def __init__(self):
         super().__init__()
 
-        self.actionOpen_Events.triggered.connect(self._open_events)
+        self.lineEditWorkingDirectory.setText(os.getcwd())
+
+        self.actionOpen_Events.triggered.connect(self._open_events_callback)
         self.tabFiles.tabCloseRequested.connect(self._close_events)
         self.tabFiles.currentChanged.connect(self._tab_changed)
+        self.buttonWorkingDirectory.pressed.connect(self._select_working_directory)
+        self.treeViewFiles.doubleClicked.connect(self._open_file_from_tree)
 
         # Close all tabs to begin with
         self._menubar_set_file_options_visible(False)
         while self.tabFiles.count() > 0:
             self.tabFiles.removeTab(0)
 
-    def _tab_changed(self, index):
+        self._open_working_directory()
 
+    def _select_working_directory(self):
+        path = QFileDialog.getExistingDirectory(self, 'Select working directory', os.path.dirname(self.lineEditWorkingDirectory.text()))
+        if path != '':
+            print('Selected', path)
+            self.lineEditWorkingDirectory.setText(path)
+            self._open_working_directory(path)
+
+    def _open_working_directory(self, path=None):
+        if path is None:
+            path = self.lineEditWorkingDirectory.text()
+
+        # Count events files
+        events_count = len(list(pathlib.Path(path).glob('**/*events.tsv')))
+        sidecar_count = len(list(pathlib.Path(path).glob('**/*events.json')))
+        self.labelCountTsv.setText(
+            '{} events.tsv {} found.'.format(events_count, ['files', 'file'][int(events_count == 1)]))
+        self.labelCountSidecar.setText(
+            '{} events.json sidecar {} found.'.format(sidecar_count, ['files', 'file'][int(sidecar_count == 1)]))
+
+        self._fileModel = QFileSystemModel()
+        self._fileModel.setFilter(QDir.AllDirs | QDir.Files | QDir.NoDotAndDotDot)
+        self._fileModel.setNameFilters(['*events.tsv', '*events.json', '*.snirf'])  # TODO settings option for all files
+        self._fileModel.setNameFilterDisables(False)
+
+        self.treeViewFiles.setModel(self._fileModel)
+        self.treeViewFiles.hideColumn(1)
+        self.treeViewFiles.hideColumn(2)
+        self.treeViewFiles.hideColumn(3)
+
+        self._fileModel.setRootPath(path)
+        self.treeViewFiles.setRootIndex(self._fileModel.index(path))
+        self.treeViewFiles.setIndentation(20)
+
+    def _tab_changed(self, index):
         if self.tabFiles.count() > 0 and type(self.tabFiles.currentWidget()) == EventsTabWidget:
             # Set the menu actions text to reflect selected Events
             name = self.tabFiles.currentWidget().name
@@ -202,10 +246,8 @@ class MainWindow(QMainWindow, UiWidget):
         self.actionSave_As.setVisible(visible)
         self.actionExport_to_SNIRF.setVisible(visible)
 
-    def _open_events(self):
-        name = 'sub-01_task-tapping_events'
-        self.tabFiles.addTab(EventsTabWidget(name), name)
-        self._menubar_set_file_options_visible(True)
+    def _open_events_callback(self):
+        self._open()
 
     def _close_events(self, index):
         print('Closing', index)
@@ -213,6 +255,27 @@ class MainWindow(QMainWindow, UiWidget):
         if not self.tabFiles.count() > 0:
             self._menubar_set_file_options_visible(False)
 
+    def _open_file_from_tree(self, index):
+        path = self._fileModel.filePath(index)
+        if path.endswith('events.tsv'):
+            self._open(path)
+        elif path.endswith('.snirf'):
+            print('Importing a SNIRF file')
+
+    def _open(self, path=None):
+        if path is None:
+            path = QFileDialog.getOpenFileName(self, 'Open *_events.tsv file', os.path.normpath(self.lineEditWorkingDirectory.text()), "TSV files (*.tsv *.csv)")[0]
+            if path == '':
+                return
+        name = os.path.split(path)[-1]
+        duplicates = 0
+        for i in range(self.tabFiles.count()):
+            if self.tabFiles.tabText(i).startswith(name):  # If file with this name already opened
+                duplicates += 1
+        if duplicates > 0:
+            name += '({})'.format(duplicates)
+        self.tabFiles.addTab(EventsTabWidget(path), name)
+        self._menubar_set_file_options_visible(True)
 
     def loadConfiguration(self):
         file = QFileDialog.getOpenFileName(self, "Load Configuration File", StimTool.config_resource_location,

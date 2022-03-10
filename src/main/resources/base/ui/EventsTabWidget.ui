@@ -10,6 +10,9 @@
     <height>480</height>
    </rect>
   </property>
+  <property name="mouseTracking">
+   <bool>true</bool>
+  </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
@@ -21,7 +24,11 @@
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
       <item row="0" column="0">
-       <widget class="QTableWidget" name="tableViewEvents"/>
+       <widget class="QTableWidget" name="tableViewEvents">
+        <property name="alternatingRowColors">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>
@@ -33,7 +40,14 @@
      </property>
      <layout class="QGridLayout" name="gridLayout">
       <item row="0" column="0">
-       <widget class="QTreeView" name="treeViewSidecar"/>
+       <widget class="QTreeView" name="treeViewSidecar">
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+        <property name="headerHidden">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>

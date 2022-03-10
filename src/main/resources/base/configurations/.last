@@ -1,3 +1,7 @@
 {
-    "MainWindow": {}
+    "MainWindow": {
+        "centralwidget": {
+            "lineEditWorkingDirectory": "C:\\Users\\sstucker\\OneDrive\\Documents\\StimTool"
+        }
+    }
 }

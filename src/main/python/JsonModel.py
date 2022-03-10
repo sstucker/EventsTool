@@ -184,10 +184,7 @@ class JsonModel(QAbstractItemModel):
                 item = index.internalPointer()
                 item.value = str(value)
 
-                if __binding__ in ("PySide", "PyQt4"):
-                    self.dataChanged.emit(index, index)
-                else:
-                    self.dataChanged.emit(index, index, [Qt.EditRole])
+                self.dataChanged.emit(index, index)
 
                 return True
 
