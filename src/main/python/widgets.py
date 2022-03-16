@@ -9,7 +9,7 @@ from PyQt5 import uic
 from PyQt5.QtCore import pyqtSignal, QTimer, QDir
 from PyQt5.QtWidgets import QWidget, QLayout, QGridLayout, QGroupBox, QMainWindow, QSpinBox, QDoubleSpinBox, QCheckBox, \
     QRadioButton, QFileDialog, QMessageBox, QLineEdit, QTextEdit, QComboBox, QDialog, QFrame, QTableWidget, QTableWidgetItem, \
-    QFileSystemModel
+    QFileSystemModel, QSplitter
 import StimTool
 
 import pathlib
@@ -150,20 +150,13 @@ class EventsTabWidget(QWidget, UiWidget):
 
     def __init__(self, path):
         super().__init__()
+
         self._path = path
         self._name = os.path.split(path)[-1]
 
         # --
 
-        self._sidecar = JsonModel()
-        self.treeViewSidecar.setModel(self._sidecar)
-        with open('test/output/sub-01_task-tapping_events.json', 'r') as file:
-            document = json.load(file)
-            self._sidecar.load(document)
-        self.treeViewSidecar.setAlternatingRowColors(True)
-        self.treeViewSidecar.resize(500, 300)
-
-        self._events = Events(path)
+        self._events = Events(path, sidecar='search')
         self._header_items = []  # List of QTableWidgetItems corresponding to the headers
         self.tableViewEvents.setRowCount(len(self._events.data))
         self.tableViewEvents.setColumnCount(len(self._events.data[0]))
@@ -175,6 +168,15 @@ class EventsTabWidget(QWidget, UiWidget):
             for j, element in enumerate(row):
                 self.tableViewEvents.setItem(i, j, QTableWidgetItem(element))
 
+        if self._events.sidecar_path is not None:
+            self._sidecar = JsonModel()
+            self.treeViewSidecar.setModel(self._sidecar)
+            with open(self._events.sidecar_path, 'r') as file:
+                document = json.load(file)
+                self._sidecar.load(document)
+            self.treeViewSidecar.setAlternatingRowColors(True)
+            self.treeViewSidecar.resize(500, 300)
+
     @property
     def name(self):
         return self._name
@@ -185,7 +187,9 @@ class MainWindow(QMainWindow, UiWidget):
     def __init__(self):
         super().__init__()
 
-        self.lineEditWorkingDirectory.setText(os.getcwd())
+        config_file = os.path.join(StimTool.config_resource_location, '.last')
+        if os.path.exists(config_file):
+            self.loadStateFromJson(config_file)
 
         self.actionOpen_Events.triggered.connect(self._open_events_callback)
         self.tabFiles.tabCloseRequested.connect(self._close_events)

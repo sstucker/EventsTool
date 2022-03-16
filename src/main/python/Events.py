@@ -105,7 +105,7 @@ class Events:
         self.task = None
 
         if filename is not None:
-            self.load(filename, sidecar)
+            self.load(filename, sidecar=sidecar)
 
     def __repr__(self):
         try:
@@ -139,7 +139,6 @@ class Events:
         self._columns = []
         self._rows = []
         self._filename = filename
-        self._sidecar = sidecar
 
         # Extract task name from tsv or SNIRF name if provided
         self.task = filename.partition("task-")[2].partition("_")[0]
@@ -150,17 +149,20 @@ class Events:
             current_dir = os.path.dirname(filename)
             sidecar_contents = None
             for lvl in range(4):  # Modality, Session, Subject, Dataset
-                # print('Searching', current_dir)
                 files = os.listdir(current_dir)
                 for file in files:
                     if file.endswith('_events.json') and self.task in file:
                         with open(os.path.join(current_dir, file)) as f:
                             sidecar_contents = json.load(f)
+                            sidecar = os.path.join(current_dir, file)
                         break
                 current_dir = os.path.dirname(current_dir)
+            if sidecar_contents is not None:
+                self._sidecar = sidecar
         elif sidecar is not None:
             with open(sidecar) as f:
                 sidecar_contents = json.load(f)
+                self._sidecar = sidecar
         else:
             sidecar_contents = None
 
@@ -189,6 +191,7 @@ class Events:
 
     def _load_snirf(self, snirf: str, sidecar_contents: dict):
         print('Loading', snirf)
+        
         with Snirf(snirf) as s:
             for nirs in s.nirs:
                 for stim in nirs.stim:
@@ -212,7 +215,7 @@ class Events:
                             elif key == 'value':
                                 col.data = {'Description': SNIRF_STIM_AMPLITUDE_DESCRIPTION}
                             elif key == 'trial_type':    
-                                col.data = {'trial_type': SNIRF_STIM_NAME_DESCRIPTION}
+                                col.data = {'Description': SNIRF_STIM_NAME_DESCRIPTION}
                             # Overwrite with sidecar fields if they exist
                             if sidecar_contents is not None:
                                 if key in sidecar_contents.keys():
@@ -239,7 +242,15 @@ class Events:
         for col in self._columns:
             s[col.name] = col.data
         return s
-    
+
+    @property
+    def events_path(self) -> str:
+        return self._events
+
+    @property
+    def sidecar_path(self) -> str:
+        return self._sidecar
+
     def sort_events(self):
         """Reorder the events by their onset."""
         try:
@@ -255,16 +266,19 @@ class Events:
         """Returns the column with `name` as a list."""
         return [row[name] for row in self._rows]
 
+
 def snirf_to_bids(snirf: str, output: str, sidecar: str=None):
     """Converts SNIRF file at `snirf` to BIDS `*_event.tsv` with optional `*_events.json` sidecar."""
     events = Events(snirf)
     events.save(output, sidecar=sidecar)
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
-    bids_events = Events('test/bids-examples/eeg_ds003654s_hed/sub-003/eeg/sub-003_task-FacePerception_run-2_events.tsv', sidecar='search')
-    print(bids_events)
+    # events_path = 'C:/Users/sstucker/Documents/EventsTool/test/bids-examples-2/bids-examples/eeg_ds003654s_hed_inheritance/sub-002/sub-002_task-FacePerception_run-1_events.tsv'
+    
+    # bids_events = Events(events_path, sidecar='search')
+    # # print(bids_events)
 
-    snirf_to_bids('test/bids-examples/BIDS-NIRS-Tapping-master/sub-01/nirs/sub-01_task-tapping_nirs.snirf',
-                  'test/output/sub-01_task-tapping_events.tsv', 'test/output/sub-01_task-tapping_events.json')
+    # snirf_to_bids('test/bids-examples/BIDS-NIRS-Tapping-master/sub-01/nirs/sub-01_task-tapping_nirs.snirf',
+    #                'test/output/sub-01_task-tapping_events.tsv', 'test/output/sub-01_task-tapping_events.json')

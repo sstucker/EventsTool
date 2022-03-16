@@ -1,7 +1,7 @@
 {
     "MainWindow": {
         "centralwidget": {
-            "lineEditWorkingDirectory": "C:\\Users\\sstucker\\OneDrive\\Documents\\StimTool"
+            "lineEditWorkingDirectory": "C:/Users/sstucker/Documents/EventsTool/test/bids-examples-2/bids-examples/eeg_ds003654s_hed_inheritance"
         }
     }
 }
